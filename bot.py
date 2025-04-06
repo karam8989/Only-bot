@@ -1,9 +1,12 @@
-import logging
+import os
 import re
+import json
+import logging
 import asyncio
 from datetime import datetime
-import pytz
 
+import pytz
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
 from aiogram.dispatcher import FSMContext
@@ -378,7 +381,7 @@ async def s2a_payment_method_selected(callback_query: types.CallbackQuery, state
     instruction = f"""<b>تعليمات الدفع:</b>
 ● الرجاء إرسال مبلغ <b>{L} ل.س</b> عبر طريقة الدفع <b>{method_full}</b> إلى الحساب التالي: <b>{account}</b>
 ● الاحتفاظ بكود نجاح عملية التحويل.
-● بعد الانتهاء، اضغط على زر "إتمام عملية الدفع".
+● بعد الإنتهاء، اضغط على زر "إتمام عملية الدفع".
 """
     keyboard = InlineKeyboardMarkup()
     keyboard.add(InlineKeyboardButton("إتمام عملية الدفع ✅️", callback_data="s2a_done"))
@@ -662,5 +665,29 @@ async def admin_cancel(callback_query: types.CallbackQuery):
     else:
         await callback_query.answer("طلب غير موجود.")
 
+# -----------------------
+# تشغيل البوت مع HTTP endpoint باستخدام aiohttp
+# -----------------------
+async def health(request):
+    return web.Response(text="Bot is running!")
+
+async def run_bot():
+    await dp.start_polling()
+
+async def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    app_web = web.Application()
+    app_web.router.add_get("/", health)
+    runner = web.AppRunner(app_web)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"HTTP server running on port {port}")
+    # ابق السيرفر يعمل إلى أجل غير مسمى
+    while True:
+        await asyncio.sleep(3600)
+
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    loop = asyncio.get_event_loop()
+    loop.create_task(run_bot())
+    loop.run_until_complete(run_web())
